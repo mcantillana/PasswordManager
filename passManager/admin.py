@@ -55,41 +55,83 @@ class ServersFilter(SimpleListFilter):
     Make facet of server names number with 3 or more
     name ocurrences
     """
+    # print self.request
     title = 'TOP Servers'
     parameter_name = 'servers'
-    # Get all objects
-    rows = passDb.objects.all()
-    # Server list
-    servers = []
-    for row in rows:
-        servers.append(row.server)
-    # Duplicate clean
-    # servers = set(servers)
 
-    # Get tuple with servers and ocurences
-    lista = {}
-    for l in set(servers):
-        numrows = passDb.objects.filter(server=l).count()
-        if numrows >= 1:
-            lista[str(l)] = numrows
-
-    # Import module for order dictionary
-    from operator import itemgetter
-    slist = sorted(lista.items(), key=itemgetter(1), reverse=True)
-
-    # Generate facets
-    facet = []
-    for n in range(0 ,(len(slist))):
-        facet.append(((slist[n][0]),(slist[n][0]+' ('+str(slist[n][1]))+')'))
+    slist = []
 
     def lookups(self, request, model_admin):
-        return (self.facet)
+
+        if request.user.is_superuser:
+
+            # Get all objects
+            rows = passDb.objects.all()
+        else:
+            rows = passDb.objects.filter(uploader = request.user)
+
+        # Server list
+        servers = []
+        for row in rows:
+            servers.append(row.server)
+        # Duplicate clean
+        # servers = set(servers)
+
+        # Get tuple with servers and ocurences
+        lista = {}
+        for l in set(servers):
+            numrows = passDb.objects.filter(server=l).count()
+            if numrows >= 1:
+                lista[str(l)] = numrows
+
+        
+
+        # Import module for order dictionary
+        from operator import itemgetter
+        slist = sorted(lista.items(), key=itemgetter(1), reverse=True)
+
+        self.slist = slist
+
+        # Generate facets
+        facet = []
+        for n in range(0 ,(len(slist))):
+            facet.append(((slist[n][0]),(slist[n][0]+' ('+str(slist[n][1]))+')'))
+
+        
+
+        return (facet)
 
     def queryset(self, request, queryset):
+    
         for n in range(0 ,(len(self.slist))):
             val = self.slist[n][0]
             if self.value() == val:
                 return queryset.filter(server=val)
+
+class UploaderFilter(SimpleListFilter):
+    """ Filter based on uploader.  """
+    
+    title = 'Uploader'
+    parameter_name = 'uploader'
+   
+
+    def lookups(self, request, model_admin):
+
+        facet = []        
+        if request.user.is_superuser:
+            rows = passDb.objects.values('uploader__id','uploader__username').distinct()     
+            for row in rows:
+                facet.append((row['uploader__id'],row['uploader__username']))
+
+        return (facet)
+    
+    def queryset(self, request, queryset):
+
+        if self.value() is None:
+            return queryset.all()
+        else:
+            return queryset.filter(uploader__id = self.value())
+
 
 class PassManagerForm(forms.ModelForm):
     model = passDb
@@ -109,7 +151,6 @@ class PassManagerAdmin(admin.ModelAdmin):
 
     formfield_overrides = {
         models.CharField: {'widget': TextInput(attrs={'size':'40'})},
-        # models.TextField: {'widget': Textarea(attrs={'rows':10, 'cols':60})},
     }
 
     ordering = ['creation_date']
@@ -128,7 +169,7 @@ class PassManagerAdmin(admin.ModelAdmin):
         "uploader"
     ]
 
-    list_filter = (LoginsFilter, ServersFilter, 'uploader','creation_date')
+    list_filter = (LoginsFilter, ServersFilter, UploaderFilter,'creation_date')
     
     
     fieldsets = [
