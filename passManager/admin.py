@@ -3,7 +3,8 @@ from django.db import models
 from django.forms import TextInput, Textarea
 from django.contrib.admin import SimpleListFilter
 
-from passManager.models import passDb
+from passManager.models import passDb, SignedCharField
+from django import forms
 
 
 class LoginsFilter(SimpleListFilter):
@@ -90,7 +91,16 @@ class ServersFilter(SimpleListFilter):
             if self.value() == val:
                 return queryset.filter(server=val)
 
+class PassManagerForm(forms.ModelForm):
+    model = passDb
+    class Meta:
+        
+        widgets = { 'password': forms.TextInput(attrs={'id': 'field_password'}), }
+
+
+ 
 class PassManagerAdmin(admin.ModelAdmin):
+    form = PassManagerForm
     class Media:
         js = ("jquery-1.7.1.min.js", "jquery-ui-1.8.18.custom.min.js", "functions.js",)
         css = {
@@ -99,7 +109,7 @@ class PassManagerAdmin(admin.ModelAdmin):
 
     formfield_overrides = {
         models.CharField: {'widget': TextInput(attrs={'size':'40'})},
-        #models.TextField: {'widget': Textarea(attrs={'rows':10, 'cols':60})},
+        # models.TextField: {'widget': Textarea(attrs={'rows':10, 'cols':60})},
     }
 
     ordering = ['creation_date']
@@ -119,12 +129,32 @@ class PassManagerAdmin(admin.ModelAdmin):
     ]
 
     list_filter = (LoginsFilter, ServersFilter, 'uploader','creation_date')
+    
+    
     fieldsets = [
 		    (None,         {'fields': ['name',('login','password'),'server','notes']}),
 		    ]
 
     search_fields = ['name','login','server','notes']
-        
+
+    def queryset(self, request):
+        qs = super(PassManagerAdmin, self).queryset(request)
+        if request.user.is_superuser:
+            return qs
+        else:
+            return qs.filter(uploader = request.user)
+
+
+    def has_change_permission(self, request, obj=None):
+        if not obj:
+            return True # So they can see the change list page
+        if request.user.is_superuser or obj.uploader == request.user:
+            return True
+        else:
+            return False
+
+    has_delete_permission = has_change_permission  
+
     def save_model(self, request, obj, form, change):
         #obj.password = passEncr('encrypt', obj.password)
         obj.uploader = request.user
