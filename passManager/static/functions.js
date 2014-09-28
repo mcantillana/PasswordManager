@@ -34,7 +34,7 @@ $(function() {
                                                                                                                                                                                  
         });                                                                                                                                                                      
 
-        $( "#field_password" ).after( '<span style="margin-left:5px;" id="generate"><a href="#"><img src="http://127.0.0.1/1411881336_reload-16.png" /></a></span>' );
+        $( "#field_password" ).after( '<span style="margin-left:5px;" id="generate"><a href="#"><img src="/static/reload-16.png" /></a></span>' );
         $('#generate').click(loadGeneratedPassword);
 
 
